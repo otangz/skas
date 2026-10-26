@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tempahan Makmal Komputer – SK All Saints</title>
+<style>
+:root{--bg:#f3f6f4;--kad:#fff;--teks:#1d2b26;--lembut:#5d6d66;--garis:#d5dfda;--utama:#1f6b4f;--utama-g:#16513c;--amaran:#b3261e}
+@media (prefers-color-scheme:dark){:root{--bg:#121917;--kad:#1b2420;--teks:#e6efeb;--lembut:#9bb0a6;--garis:#2e3b36;--utama:#4fb88f;--utama-g:#6fd0a8;--amaran:#ff8a80}}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--teks);line-height:1.5}
+header{padding:20px 16px 8px;max-width:1000px;margin:auto}
+h1{margin:0;font-size:1.5rem}header p{margin:2px 0 0;color:var(--lembut)}
+main{max-width:1000px;margin:auto;padding:12px 16px 40px;display:grid;gap:16px;grid-template-columns:340px 1fr}
+@media(max-width:820px){main{grid-template-columns:1fr}}
+section{background:var(--kad);border:1px solid var(--garis);border-radius:10px;padding:16px}
+h2{margin:0 0 12px;font-size:1.05rem}
+label{display:block;font-size:.85rem;color:var(--lembut);margin:10px 0 4px}
+select,input{width:100%;padding:9px 10px;border:1px solid var(--garis);border-radius:6px;background:var(--bg);color:var(--teks);font:inherit}
+select:focus,input:focus,button:focus-visible{outline:2px solid var(--utama);outline-offset:1px}
+.baris{display:flex;gap:8px}.baris>*{flex:1}
+.tambah{display:flex;gap:6px;margin-top:6px}.tambah input{flex:1}
+button{font:inherit;cursor:pointer;border-radius:6px;border:1px solid var(--utama);background:var(--utama);color:#fff;padding:9px 14px}
+button:hover{background:var(--utama-g)}
+button.kecil{padding:6px 10px;background:transparent;color:var(--utama);border-color:var(--garis)}
+button.kecil:hover{background:var(--bg)}
+button.padam{color:var(--amaran);padding:4px 8px;background:transparent;border-color:var(--garis)}
+button.padam:hover{background:var(--bg)}
+.hantar{width:100%;margin-top:16px;padding:11px}
+#mesej{margin-top:10px;font-size:.9rem;min-height:1.3em}.ralat{color:var(--amaran)}.ok{color:var(--utama)}
+.tapis{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}.tapis input{max-width:170px}
+.skrol{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.92rem}
+th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--garis);white-space:nowrap}
+th{color:var(--lembut);font-weight:600}
+.kosong{color:var(--lembut);padding:16px 0}
+</style>
+</head>
+<body>
+<header>
+  <h1>Tempahan Makmal Komputer</h1>
+  <p>SK All Saints</p>
+</header>
+<main>
+  <section aria-labelledby="t-borang">
+    <h2 id="t-borang">Tempahan baharu</h2>
+
+    <label for="guru">Guru</label>
+    <select id="guru"></select>
+    <div class="tambah"><input id="guruBaru" placeholder="Guru tiada dalam senarai? Taip nama"><button class="kecil" id="btnGuru" type="button">Tambah</button></div>
+
+    <label for="kelas">Kelas</label>
+    <select id="kelas"></select>
+    <div class="tambah"><input id="kelasBaru" placeholder="Kelas tiada dalam senarai? Taip nama"><button class="kecil" id="btnKelas" type="button">Tambah</button></div>
+
+    <label for="tarikh">Tarikh</label>
+    <input type="date" id="tarikh">
+    <div class="baris">
+      <div><label for="mula">Masa mula</label><input type="time" id="mula" value="08:00"></div>
+      <div><label for="tamat">Masa tamat</label><input type="time" id="tamat" value="09:00"></div>
+    </div>
+    <button class="hantar" id="btnSimpan" type="button">Simpan tempahan</button>
+    <div id="mesej" role="status" aria-live="polite"></div>
+  </section>
+
+  <section aria-labelledby="t-senarai">
+    <div class="tapis">
+      <h2 id="t-senarai" style="margin:0">Senarai tempahan</h2>
+      <input type="date" id="tapis" aria-label="Tapis mengikut tarikh" title="Tapis mengikut tarikh">
+    </div>
+    <div class="skrol"><table>
+      <thead><tr><th>Tarikh</th><th>Masa</th><th>Guru</th><th>Kelas</th><th></th></tr></thead>
+      <tbody id="isi"></tbody>
+    </table></div>
+    <div id="kosong" class="kosong" hidden>Tiada tempahan lagi.</div>
+  </section>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+let tempahan = [];
+
+async function api(url, opt) {
+  const r = await fetch(url, opt && { ...opt, headers: { 'Content-Type': 'application/json' }, body: opt.body && JSON.stringify(opt.body) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.ralat || 'Ralat berlaku');
+  return d;
+}
+function mesej(teks, jenis) { $('mesej').textContent = teks; $('mesej').className = jenis; }
+function isiPilihan(el, senarai, pilih) {
+  el.innerHTML = '';
+  if (!senarai.length) el.append(new Option('— Belum ada, sila tambah —', ''));
+  senarai.forEach(s => el.append(new Option(s.nama, s.id)));
+  if (pilih) el.value = pilih;
+}
+async function muatGuru(pilih) { isiPilihan($('guru'), await api('/api/guru'), pilih); }
+async function muatKelas(pilih) { isiPilihan($('kelas'), await api('/api/kelas'), pilih); }
+
+async function tambahNama(jenis, inputEl) {
+  const nama = inputEl.value.trim();
+  if (!nama) return;
+  try {
+    const d = await api('/api/' + jenis, { method: 'POST', body: { nama } });
+    inputEl.value = '';
+    await (jenis === 'guru' ? muatGuru(d.id) : muatKelas(d.id));
+    mesej(`"${d.nama}" ditambah dan dipilih.`, 'ok');
+  } catch (e) { mesej(e.message, 'ralat'); }
+}
+$('btnGuru').onclick = () => tambahNama('guru', $('guruBaru'));
+$('btnKelas').onclick = () => tambahNama('kelas', $('kelasBaru'));
+$('guruBaru').onkeydown = e => e.key === 'Enter' && tambahNama('guru', e.target);
+$('kelasBaru').onkeydown = e => e.key === 'Enter' && tambahNama('kelas', e.target);
+
+function tarikhMY(t) { const [y, m, d] = t.split('-'); return `${d}/${m}/${y}`; }
+function lukis() {
+  const f = $('tapis').value;
+  const senarai = f ? tempahan.filter(t => t.tarikh === f) : tempahan;
+  const isi = $('isi'); isi.innerHTML = '';
+  senarai.forEach(t => {
+    const tr = document.createElement('tr');
+    [tarikhMY(t.tarikh), `${t.mula}–${t.tamat}`, t.guru, t.kelas].forEach(v => { const td = document.createElement('td'); td.textContent = v; tr.append(td); });
+    const td = document.createElement('td'), b = document.createElement('button');
+    b.className = 'padam'; b.textContent = 'Padam'; b.onclick = () => padam(t);
+    td.append(b); tr.append(td); isi.append(tr);
+  });
+  $('kosong').hidden = senarai.length > 0;
+}
+async function muatTempahan() { tempahan = await api('/api/tempahan'); lukis(); }
+async function padam(t) {
+  if (!confirm(`Padam tempahan ${t.guru} (${t.kelas}) pada ${tarikhMY(t.tarikh)}, ${t.mula}–${t.tamat}?`)) return;
+  try { await api('/api/tempahan/' + t.id, { method: 'DELETE' }); await muatTempahan(); mesej('Tempahan dipadam.', 'ok'); }
+  catch (e) { mesej(e.message, 'ralat'); }
+}
+$('tapis').onchange = lukis;
+
+$('btnSimpan').onclick = async () => {
+  const body = { guru_id: $('guru').value, kelas_id: $('kelas').value, tarikh: $('tarikh').value, mula: $('mula').value, tamat: $('tamat').value };
+  try {
+    await api('/api/tempahan', { method: 'POST', body });
+    await muatTempahan();
+    mesej('Tempahan disimpan.', 'ok');
+  } catch (e) { mesej(e.message, 'ralat'); }
+};
+
+(async () => {
+  const hari = new Date(); hari.setMinutes(hari.getMinutes() - hari.getTimezoneOffset());
+  $('tarikh').value = hari.toISOString().slice(0, 10);
+  try { await Promise.all([muatGuru(), muatKelas(), muatTempahan()]); }
+  catch (e) { mesej('Gagal memuatkan data: ' + e.message, 'ralat'); }
+})();
+</script>
+</body>
+</html>
